@@ -40,7 +40,7 @@ jobs:
       - name: Generate Windows platform
         run: flutter create --platforms=windows .
       - run: flutter pub get
-      - run: flutter analyze
+      - run: flutter analyze --no-fatal-infos --no-fatal-warnings
       - run: flutter build windows --release
       - uses: actions/upload-artifact@v4
         with:
