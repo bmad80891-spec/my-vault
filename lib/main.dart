@@ -288,7 +288,7 @@ class _VaultHomeState extends State<VaultHome> {
           Text(t('Your digital life, safely stored.', 'حياتك الرقمية، محفوظة بأمان.'),
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800, color: charcoal)),
           const SizedBox(height: 6),
-          Text(t('\${entries.length} saved accounts', '\${entries.length} حساب محفوظ'), style: const TextStyle(color: Colors.black54)),
+          Text(t('${entries.length} saved accounts', '${entries.length} حساب محفوظ'), style: const TextStyle(color: Colors.black54)),
           const SizedBox(height: 20),
           TextField(onChanged: (v) => setState(() => query = v),
             decoration: InputDecoration(hintText: t('Search accounts…', 'ابحث في الحسابات…'), prefixIcon: const Icon(Icons.search))),
