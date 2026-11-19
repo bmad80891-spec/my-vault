@@ -1,11 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
+import 'dart:math' as math;
 
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
-import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 class VaultEntry {
@@ -63,7 +62,7 @@ class VaultStore {
   static const _checkText = 'MY_VAULT_LOCAL_UNLOCK_CHECK_V1';
   static const _iterations = 210000;
   final _cipher = AesGcm.with256bits();
-  final _random = Cryptography.instance;
+  final _random = math.Random.secure();
   Database? _db;
   Uint8List? _key;
 
@@ -109,7 +108,7 @@ class VaultStore {
     if (await hasMasterPassword()) {
       throw StateError('A master password has already been created.');
     }
-    final salt = await _random.newRandomBytes(16);
+    final salt = List<int>.generate(16, (_) => _random.nextInt(256));
     final key = await _deriveKey(password, salt);
     final verifier = await _cipher.encrypt(
       utf8.encode(_checkText),
