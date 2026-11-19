@@ -109,7 +109,7 @@ class VaultStore {
     if (await hasMasterPassword()) {
       throw StateError('A master password has already been created.');
     }
-    final salt = await _random.randomBytes(16);
+    final salt = await _random.newRandomBytes(16);
     final key = await _deriveKey(password, salt);
     final verifier = await _cipher.encrypt(
       utf8.encode(_checkText),
