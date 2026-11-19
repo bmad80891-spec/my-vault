@@ -1,11 +1,22 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:my_vault/main.dart';
+import 'package:my_vault/vault_store.dart';
 
 void main() {
-  testWidgets('My Vault starts successfully', (WidgetTester tester) async {
-    await tester.pumpWidget(const MyVaultApp());
+  test('Vault entries preserve account fields when serialized', () {
+    const entry = VaultEntry(
+      id: 'test-1',
+      service: 'Example',
+      username: 'sample-user',
+      email: 'sample@example.invalid',
+      category: 'Social',
+    );
 
-    expect(find.text('My Vault'), findsOneWidget);
-    expect(find.text('Your digital life, safely stored.'), findsOneWidget);
+    final restored = VaultEntry.fromJson(entry.toJson());
+
+    expect(restored.id, entry.id);
+    expect(restored.service, entry.service);
+    expect(restored.username, entry.username);
+    expect(restored.email, entry.email);
+    expect(restored.category, entry.category);
   });
 }
