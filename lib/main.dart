@@ -84,7 +84,7 @@ class _VaultGateState extends State<VaultGate> {
         final ok = await VaultStore.instance.unlock(password.text);
         if (!ok) throw ArgumentError(t('Incorrect master password.', 'كلمة المرور الرئيسية غير صحيحة.'));
       }
-      if (mounted) setState(() => unlocked = true);
+      if (mounted) setState(() { hasMaster = true; unlocked = true; });
     } catch (e) {
       if (mounted) setState(() => error = e is ArgumentError
           ? e.message.toString()
