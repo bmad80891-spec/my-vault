@@ -1,50 +1,163 @@
-name: Build My Vault
+﻿name: Build my_vault_rs
 
 on:
   push:
-    branches: [main]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  android:
-    name: Build Android APK
+  linux:
+    name: Build Linux (x86_64)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
         with:
-          channel: stable
-          flutter-version: '3.50.0'
-      - name: Generate Android platform
-        run: flutter create --platforms=android .
-      - run: flutter pub get
-      - run: flutter analyze --no-fatal-infos --no-fatal-warnings
-      - run: flutter build apk --release
-      - uses: actions/upload-artifact@v4
+          targets: x86_64-unknown-linux-gnu
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            pkg-config \
+            libssl-dev \
+            libxcb-render0-dev \
+            libxcb-shape0-dev \
+            libxcb-xfixes0-dev \
+            libxkbcommon-dev \
+            libxkbcommon-x11-dev \
+            libwayland-dev \
+            libgtk-3-dev \
+            libasound2-dev
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check (Linux)
+        run: cargo check --all-targets --target x86_64-unknown-linux-gnu
+
+      - name: Test (Linux)
+        run: cargo test --all-targets --target x86_64-unknown-linux-gnu
+
+      - name: Build release (Linux)
+        run: cargo build --release --target x86_64-unknown-linux-gnu
+
+      - name: Collect Linux artifacts
+        run: |
+          mkdir -p dist_test
+          cp target/x86_64-unknown-linux-gnu/release/my_vault_rs dist_test/my_vault_rs-linux-x86_64
+          chmod +x dist_test/my_vault_rs-linux-x86_64
+          (cd dist_test && sha256sum my_vault_rs-linux-x86_64 > my_vault_rs-linux-x86_64.sha256 || shasum -a 256 my_vault_rs-linux-x86_64 > my_vault_rs-linux-x86_64.sha256)
+          ls -la dist_test
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
         with:
-          name: my-vault-android-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          name: my_vault_rs-linux-x86_64
+          path: |
+            dist_test/my_vault_rs-linux-x86_64
+            dist_test/my_vault_rs-linux-x86_64.sha256
+          if-no-files-found: error
 
   windows:
-    name: Build Windows app
+    name: Build Windows (x86_64)
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
         with:
-          channel: stable
-          flutter-version: '3.50.0'
-      - name: Generate Windows platform
-        run: flutter create --platforms=windows .
-      - run: flutter pub get
-      - run: flutter analyze --no-fatal-infos --no-fatal-warnings
-      - run: flutter build windows --release
-      - uses: actions/upload-artifact@v4
+          targets: x86_64-pc-windows-msvc
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check (Windows)
+        run: cargo check --all-targets --target x86_64-pc-windows-msvc
+
+      - name: Test (Windows)
+        run: cargo test --all-targets --target x86_64-pc-windows-msvc
+
+      - name: Build release (Windows)
+        run: cargo build --release --target x86_64-pc-windows-msvc
+
+      - name: Collect Windows artifacts
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist_test | Out-Null
+          Copy-Item target/x86_64-pc-windows-msvc/release/my_vault_rs.exe dist_test/my_vault_rs-windows-x86_64.exe
+          $hash = (Get-FileHash dist_test/my_vault_rs-windows-x86_64.exe -Algorithm SHA256).Hash.ToLower()
+          "$hash  my_vault_rs-windows-x86_64.exe" | Set-Content -Encoding ascii dist_test/my_vault_rs-windows-x86_64.exe.sha256
+          Get-ChildItem dist_test
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
         with:
-          name: my-vault-windows
-          path: build/windows/x64/runner/Release/
+          name: my_vault_rs-windows-x86_64
+          path: |
+            dist_test/my_vault_rs-windows-x86_64.exe
+            dist_test/my_vault_rs-windows-x86_64.exe.sha256
+          if-no-files-found: error
+
+  android:
+    name: Build Android (aarch64)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK/NDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK and cargo-ndk
+        run: |
+          sdkmanager --install "ndk;26.1.10909125" "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/26.1.10909125" >> $GITHUB_ENV
+          echo "NDK_HOME=$ANDROID_SDK_ROOT/ndk/26.1.10909125" >> $GITHUB_ENV
+          cargo install cargo-ndk --locked
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check (Android)
+        run: cargo ndk -t arm64-v8a check --target aarch64-linux-android --lib
+
+      - name: Test (host unit tests)
+        run: cargo test --lib
+
+      - name: Build release (Android)
+        run: cargo ndk -t arm64-v8a -o dist_test/android build --release --target aarch64-linux-android --lib
+
+      - name: Collect Android artifacts
+        run: |
+          mkdir -p dist_test
+          find dist_test/android -type f -maxdepth 4 -print || true
+          # Package Android native outputs for artifact upload
+          (cd dist_test && tar -czf my_vault_rs-android-arm64-native.tar.gz android)
+          (cd dist_test && sha256sum my_vault_rs-android-arm64-native.tar.gz > my_vault_rs-android-arm64-native.tar.gz.sha256)
+          ls -la dist_test
+
+      - name: Upload Android artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: my_vault_rs-android-arm64
+          path: |
+            dist_test/my_vault_rs-android-arm64-native.tar.gz
+            dist_test/my_vault_rs-android-arm64-native.tar.gz.sha256
+            dist_test/android/**
+          if-no-files-found: warn

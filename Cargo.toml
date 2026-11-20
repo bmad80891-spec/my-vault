@@ -1,0 +1,44 @@
+﻿[package]
+name = "my_vault_rs"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "my_vault_rs"
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "my_vault_rs"
+path = "src/main.rs"
+
+[dependencies]
+eframe = { version = "0.31", default-features = false, features = ["default_fonts", "glow", "persistence"] }
+egui = "0.31"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+zeroize = { version = "1", features = ["derive"] }
+rand = "0.8"
+hmac = "0.12"
+sha1 = "0.10"
+sha2 = "0.10"
+data-encoding = "2"
+url = "2"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "bmp", "gif", "webp"] }
+rqrr = "0.8"
+rfd = "0.15"
+thiserror = "2"
+base64 = "0.22"
+
+[target.'cfg(any(target_os = "windows", target_os = "linux"))'.dependencies]
+xcap = "0.8"
+
+[target.'cfg(target_os = "android")'.dependencies]
+jni = "0.21"
+ndk-context = "0.1"
+log = "0.4"
+android_logger = "0.14"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

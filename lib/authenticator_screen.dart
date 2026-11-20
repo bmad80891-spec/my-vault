@@ -4,7 +4,6 @@ import 'dart:typed_data';
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import 'vault_store.dart';
@@ -118,46 +117,41 @@ class _AuthenticatorScreenState extends State<AuthenticatorScreen> {
   }
 
   Future<void> _chooseAddMethod() async {
-    final scan = await showDialog<bool>(
+    final action = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(t('Add 2FA account', 'إضافة حساب 2FA')),
-        content: Text(t('Choose how to add the account.', 'اختر طريقة إضافة الحساب.')),
+        content: Text(t(
+          'Camera QR scanning is removed. Choose image-file import (all platforms) or desktop window/region capture in the Rust app, or enter manually here.',
+          'تمت إزالة المسح بالكاميرا. اختر استيراد صورة QR أو المسح من نافذة/منطقة على سطح المكتب (في تطبيق Rust) أو الإدخال اليدوي هنا.',
+        )),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
+            onPressed: () => Navigator.pop(ctx, 'manual'),
             child: Text(t('Enter manually', 'إدخال يدوي')),
           ),
           FilledButton.icon(
-            onPressed: () => Navigator.pop(ctx, true),
-            icon: const Icon(Icons.qr_code_scanner),
-            label: Text(t('Scan QR code', 'مسح QR')),
+            onPressed: () => Navigator.pop(ctx, 'image'),
+            icon: const Icon(Icons.image_outlined),
+            label: Text(t('Import QR image', 'استيراد صورة QR')),
           ),
         ],
       ),
     );
-    if (scan == null) return;
-    if (!scan) {
+    if (action == null) return;
+    if (action == 'manual') {
       await _addEntry();
       return;
     }
-    final payload = await Navigator.of(context).push<String>(
-      MaterialPageRoute(builder: (_) => QrScannerScreen(isArabic: widget.isArabic)),
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(t(
+          'Use the Rust desktop/mobile app flow for image-file QR import and desktop window/region capture (camera scanning removed).',
+          'استخدم تطبيق Rust لاستيراد صورة QR أو المسح من نافذة/منطقة سطح المكتب (تمت إزالة المسح بالكاميرا).',
+        )),
+      ),
     );
-    if (payload == null || !mounted) return;
-    try {
-      final parsed = _parseOtpAuthUri(payload);
-      await _addEntry(
-        initialIssuer: parsed.issuer,
-        initialAccount: parsed.account,
-        initialSecret: parsed.secret,
-      );
-    } on FormatException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
-    }
   }
 
   TotpEntry _parseOtpAuthUri(String raw) {
@@ -469,73 +463,3 @@ class _AuthenticatorScreenState extends State<AuthenticatorScreen> {
   }
 }
 
-
-class QrScannerScreen extends StatefulWidget {
-  const QrScannerScreen({super.key, required this.isArabic});
-  final bool isArabic;
-
-  @override
-  State<QrScannerScreen> createState() => _QrScannerScreenState();
-}
-
-class _QrScannerScreenState extends State<QrScannerScreen> {
-  bool detected = false;
-
-  String t(String en, String ar) => widget.isArabic ? ar : en;
-
-  void _onDetect(BarcodeCapture capture) {
-    if (detected) return;
-    for (final barcode in capture.barcodes) {
-      final value = barcode.rawValue;
-      if (value == null || value.trim().isEmpty) continue;
-      detected = true;
-      Navigator.of(context).pop(value.trim());
-      return;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(t('Scan authenticator QR', 'مسح رمز QR للموثّق')),
-      ),
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          MobileScanner(onDetect: _onDetect),
-          IgnorePointer(
-            child: Center(
-              child: Container(
-                width: 260,
-                height: 190,
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.white, width: 3),
-                  borderRadius: BorderRadius.circular(18),
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            left: 20,
-            right: 20,
-            bottom: 28,
-            child: Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.72),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Text(
-                t('Place the TOTP QR code inside the frame.',
-                    'ضع رمز QR الخاص بـ TOTP داخل الإطار.'),
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
