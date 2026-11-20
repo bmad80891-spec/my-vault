@@ -97,7 +97,7 @@ class _AuthenticatorScreenState extends State<AuthenticatorScreen> {
   }
 
   Uint8List _decodeBase32(String input) {
-    final normalized = input.toUpperCase().replaceAll(RegExp(r'[\\s=\\-]'), '');
+    final normalized = input.toUpperCase().replaceAll(RegExp(r'[\s=-]'), '');
     const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
     final output = <int>[];
     var buffer = 0;
