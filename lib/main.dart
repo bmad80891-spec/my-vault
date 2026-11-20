@@ -1,8 +1,16 @@
+
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'vault_store.dart';
 import 'authenticator_screen.dart';
+import 'supabase_bootstrap.dart';
 
-void main() => runApp(const MyVaultApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await SupabaseBootstrap.initializeIfConfigured();
+  runApp(const MyVaultApp());
+}
+
 
 const cream = Color(0xFFF5F0E5);
 const charcoal = Color(0xFF222420);
