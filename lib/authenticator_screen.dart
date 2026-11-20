@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 
 import 'vault_store.dart';
 
@@ -115,7 +116,103 @@ class _AuthenticatorScreenState extends State<AuthenticatorScreen> {
     return Uint8List.fromList(output);
   }
 
-  Future<void> _addEntry() async {
+  Future<void> _chooseAddMethod() async {
+    final scan = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(t('Add 2FA account', 'إضافة حساب 2FA')),
+        content: Text(t('Choose how to add the account.', 'اختر طريقة إضافة الحساب.')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(t('Enter manually', 'إدخال يدوي')),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(ctx, true),
+            icon: const Icon(Icons.qr_code_scanner),
+            label: Text(t('Scan QR code', 'مسح QR')),
+          ),
+        ],
+      ),
+    );
+    if (scan == null) return;
+    if (!scan) {
+      await _addEntry();
+      return;
+    }
+    final payload = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => QrScannerScreen(isArabic: widget.isArabic)),
+    );
+    if (payload == null || !mounted) return;
+    try {
+      final parsed = _parseOtpAuthUri(payload);
+      await _addEntry(
+        initialIssuer: parsed.issuer,
+        initialAccount: parsed.account,
+        initialSecret: parsed.secret,
+      );
+    } on FormatException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    }
+  }
+
+  TotpEntry _parseOtpAuthUri(String raw) {
+    final uri = Uri.tryParse(raw.trim());
+    if (uri == null ||
+        uri.scheme.toLowerCase() != 'otpauth' ||
+        uri.host.toLowerCase() != 'totp') {
+      throw FormatException(t('This is not a valid TOTP QR code.', 'رمز QR ليس رابط TOTP صالحاً.'));
+    }
+    final params = uri.queryParameters;
+    final secretValue = params['secret']?.trim();
+    if (secretValue == null || secretValue.isEmpty) {
+      throw FormatException(t('The QR code has no secret key.', 'رمز QR لا يحتوي على مفتاح سري.'));
+    }
+    final algorithm = (params['algorithm'] ?? 'SHA1').toUpperCase();
+    final digits = int.tryParse(params['digits'] ?? '6') ?? 0;
+    final period = int.tryParse(params['period'] ?? '30') ?? 0;
+    if (algorithm != 'SHA1' || digits != 6 || period != 30) {
+      throw FormatException(t(
+        'Only SHA1, 6-digit, 30-second TOTP accounts are supported.',
+        'ندعم حالياً SHA1 ورموزاً من 6 أرقام تتجدد كل 30 ثانية فقط.',
+      ));
+    }
+    final label = uri.pathSegments.isEmpty ? '' : uri.pathSegments.join('/');
+    var labelIssuer = '';
+    var account = label;
+    final separator = label.indexOf(':');
+    if (separator >= 0) {
+      labelIssuer = label.substring(0, separator);
+      account = label.substring(separator + 1);
+    }
+    final queryIssuer = (params['issuer'] ?? '').trim();
+    final issuer = queryIssuer.isNotEmpty ? queryIssuer : labelIssuer.trim();
+    if (issuer.isEmpty) {
+      throw FormatException(t('The QR code has no service name.', 'رمز QR لا يحتوي على اسم الخدمة.'));
+    }
+    final normalizedSecret = secretValue.replaceAll(RegExp(r'\s+'), '').toUpperCase();
+    if (_decodeBase32(normalizedSecret).isEmpty) {
+      throw FormatException(t('The QR secret key is invalid.', 'المفتاح السري في QR غير صالح.'));
+    }
+    return TotpEntry(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      issuer: issuer,
+      account: account.trim(),
+      secret: normalizedSecret,
+    );
+  }
+
+  Future<void> _addEntry({
+    String initialIssuer = '',
+    String initialAccount = '',
+    String initialSecret = '',
+  }) async {
+    final issuer = TextEditingController(text: initialIssuer);
+    final account = TextEditingController(text: initialAccount);
+    final secret = TextEditingController(text: initialSecret);
     final issuer = TextEditingController();
     final account = TextEditingController();
     final secret = TextEditingController();
@@ -217,7 +314,7 @@ class _AuthenticatorScreenState extends State<AuthenticatorScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(t('Authenticator', 'الموثّق Authenticator'))),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _addEntry,
+        onPressed: _chooseAddMethod,
         backgroundColor: const Color(0xFF254F43),
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add),
@@ -302,6 +399,77 @@ class _AuthenticatorScreenState extends State<AuthenticatorScreen> {
                         )),
                   ],
                 ),
+    );
+  }
+}
+
+
+class QrScannerScreen extends StatefulWidget {
+  const QrScannerScreen({super.key, required this.isArabic});
+  final bool isArabic;
+
+  @override
+  State<QrScannerScreen> createState() => _QrScannerScreenState();
+}
+
+class _QrScannerScreenState extends State<QrScannerScreen> {
+  bool detected = false;
+
+  String t(String en, String ar) => widget.isArabic ? ar : en;
+
+  void _onDetect(BarcodeCapture capture) {
+    if (detected) return;
+    for (final barcode in capture.barcodes) {
+      final value = barcode.rawValue;
+      if (value == null || value.trim().isEmpty) continue;
+      detected = true;
+      Navigator.of(context).pop(value.trim());
+      return;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(t('Scan authenticator QR', 'مسح رمز QR للموثّق')),
+      ),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          MobileScanner(onDetect: _onDetect),
+          IgnorePointer(
+            child: Center(
+              child: Container(
+                width: 260,
+                height: 190,
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.white, width: 3),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            left: 20,
+            right: 20,
+            bottom: 28,
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.72),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Text(
+                t('Place the TOTP QR code inside the frame.',
+                    'ضع رمز QR الخاص بـ TOTP داخل الإطار.'),
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
