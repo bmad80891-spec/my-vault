@@ -260,34 +260,6 @@ class _AuthenticatorScreenState extends State<AuthenticatorScreen> {
                     ),
                     const SizedBox(height: 8),
                     ...entries.map((entry) => Card(
-                          margin: const EdgeInsets.only(bottom: 10),
-                          child: ListTile(
-                            title: Text(entry.issuer,
-                                style: const TextStyle(fontWeight: FontWeight.bold)),
-                            subtitle: Text(entry.account.isEmpty ? 'TOTP • SHA-1' : entry.account),
-                            leading: const CircleAvatar(
-                              backgroundColor: Color(0xFFF5F0E5),
-                              child: Icon(Icons.security, color: Color(0xFF254F43)),
-                            ),
-                            trailing: PopupMenuButton<String>(
-                              onSelected: (value) {
-                                if (value == 'delete') _delete(entry);
-                              },
-                              itemBuilder: (_) => [
-                                PopupMenuItem(
-                                  value: 'delete',
-                                  child: Text(t('Remove', 'حذف')),
-                                ),
-                              ],
-                            ),
-                            isThreeLine: true,
-                          ),
-                        )).toList()
-                        .map((tile) {
-                          final index = entries.indexWhere((e) => e.issuer == (tile as ListTile).title.toString());
-                          return tile;
-                        }).toList(),
-                    ...entries.map((entry) => Card(
                           child: Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
                             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
