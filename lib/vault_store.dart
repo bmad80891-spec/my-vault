@@ -77,7 +77,7 @@ class VaultStore {
     final root = await getDatabasesPath();
     _db = await openDatabase(
       p.join(root, 'my_vault_secure.db'),
-      version: 1,
+      version: 2,
       onCreate: (db, version) async {
         await db.execute(
           'CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)',
@@ -85,6 +85,16 @@ class VaultStore {
         await db.execute(
           'CREATE TABLE entries (id TEXT PRIMARY KEY, nonce TEXT NOT NULL, cipher_text TEXT NOT NULL, mac TEXT NOT NULL, updated_at INTEGER NOT NULL)',
         );
+        await db.execute(
+          'CREATE TABLE totp_entries (id TEXT PRIMARY KEY, nonce TEXT NOT NULL, cipher_text TEXT NOT NULL, mac TEXT NOT NULL, updated_at INTEGER NOT NULL)',
+        );
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          await db.execute(
+            'CREATE TABLE totp_entries (id TEXT PRIMARY KEY, nonce TEXT NOT NULL, cipher_text TEXT NOT NULL, mac TEXT NOT NULL, updated_at INTEGER NOT NULL)',
+          );
+        }
       },
     );
   }
@@ -228,8 +238,81 @@ class VaultStore {
     await _db!.delete('entries', where: 'id = ?', whereArgs: [id]);
   }
 
+  Future<void> saveTotpEntry(TotpEntry entry) async {
+    final key = _key;
+    if (key == null) throw StateError('Vault is locked.');
+    final box = await _cipher.encrypt(
+      utf8.encode(jsonEncode(entry.toJson())),
+      secretKey: SecretKey(key),
+    );
+    await _db!.insert(
+      'totp_entries',
+      {
+        'id': entry.id,
+        'nonce': base64Encode(box.nonce),
+        'cipher_text': base64Encode(box.cipherText),
+        'mac': base64Encode(box.mac.bytes),
+        'updated_at': DateTime.now().millisecondsSinceEpoch,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<List<TotpEntry>> loadTotpEntries() async {
+    final key = _key;
+    if (key == null) throw StateError('Vault is locked.');
+    final rows = await _db!.query('totp_entries', orderBy: 'updated_at DESC');
+    final result = <TotpEntry>[];
+    for (final row in rows) {
+      final box = SecretBox(
+        base64Decode(row['cipher_text'] as String),
+        nonce: base64Decode(row['nonce'] as String),
+        mac: Mac(base64Decode(row['mac'] as String)),
+      );
+      final clear = await _cipher.decrypt(box, secretKey: SecretKey(key));
+      result.add(TotpEntry.fromJson(
+        jsonDecode(utf8.decode(clear)) as Map<String, dynamic>,
+      ));
+    }
+    return result;
+  }
+
+  Future<void> deleteTotpEntry(String id) async {
+    if (_key == null) throw StateError('Vault is locked.');
+    await _db!.delete('totp_entries', where: 'id = ?', whereArgs: [id]);
+  }
+
   Future<void> lock() async {
     _key?.fillRange(0, _key!.length, 0);
     _key = null;
   }
+}
+
+
+class TotpEntry {
+  const TotpEntry({
+    required this.id,
+    required this.issuer,
+    required this.account,
+    required this.secret,
+  });
+
+  final String id;
+  final String issuer;
+  final String account;
+  final String secret;
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'issuer': issuer,
+        'account': account,
+        'secret': secret,
+      };
+
+  factory TotpEntry.fromJson(Map<String, dynamic> json) => TotpEntry(
+        id: json['id'] as String,
+        issuer: json['issuer'] as String? ?? '',
+        account: json['account'] as String? ?? '',
+        secret: json['secret'] as String,
+      );
 }
