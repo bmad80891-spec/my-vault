@@ -19,6 +19,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: '3.50.0'
       - name: Generate Android platform
         run: flutter create --platforms=android .
       - run: flutter pub get
@@ -37,6 +38,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: '3.50.0'
       - name: Generate Windows platform
         run: flutter create --platforms=windows .
       - run: flutter pub get
