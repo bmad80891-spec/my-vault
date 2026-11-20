@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'vault_store.dart';
+import 'authenticator_screen.dart';
 
 void main() => runApp(const MyVaultApp());
 
@@ -274,6 +275,15 @@ class _VaultHomeState extends State<VaultHome> {
         title: const Text('My Vault', style: TextStyle(fontWeight: FontWeight.w800)),
         actions: [
           IconButton(tooltip: t('Language', 'اللغة'), onPressed: widget.onToggleLanguage, icon: const Icon(Icons.language)),
+          IconButton(
+            tooltip: t('Authenticator', 'الموثّق'),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => AuthenticatorScreen(isArabic: widget.isArabic),
+              ),
+            ),
+            icon: const Icon(Icons.phonelink_lock),
+          ),
           IconButton(tooltip: t('Lock vault', 'قفل الخزنة'), onPressed: widget.onLock, icon: const Icon(Icons.lock_outline)),
           const SizedBox(width: 8),
         ],
