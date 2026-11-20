@@ -5,6 +5,7 @@ import 'package:cryptography/cryptography.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 import 'vault_store.dart';
 
@@ -288,6 +289,69 @@ class _AuthenticatorScreenState extends State<AuthenticatorScreen> {
     await _load();
   }
 
+
+  Future<void> _showEntryQr(TotpEntry entry) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(t('Show setup QR?', 'عرض رمز الإعداد؟')),
+        content: Text(t(
+          'This QR contains the account’s secret 2FA key. Anyone who scans it may generate the same verification codes. Show it only on a trusted screen.',
+          'يحتوي هذا الرمز على مفتاح 2FA السري. أي شخص يمسحه قد يتمكن من توليد رموز التحقق نفسها. اعرضه فقط على شاشة موثوقة.',
+        )),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(t('Cancel', 'إلغاء')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(t('Show QR', 'اعرض QR')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final label = entry.account.isEmpty
+        ? entry.issuer
+        : '${entry.issuer}:${entry.account}';
+    final uri = Uri(
+      scheme: 'otpauth',
+      host: 'totp',
+      path: '/$label',
+      queryParameters: {
+        'secret': entry.secret,
+        'issuer': entry.issuer,
+        'algorithm': 'SHA1',
+        'digits': '6',
+        'period': '30',
+      },
+    ).toString();
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(t('Authenticator QR', 'رمز Authenticator')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            QrImageView(data: uri, size: 230),
+            const SizedBox(height: 12),
+            Text(t(
+              'Keep this QR private. Close it when you finish.',
+              'حافظ على سرية هذا الرمز وأغلقه بعد الانتهاء.',
+            ), textAlign: TextAlign.center),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(t('Close', 'إغلاق')),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _delete(TotpEntry entry) async {
     final yes = await showDialog<bool>(
       context: context,
@@ -384,6 +448,11 @@ class _AuthenticatorScreenState extends State<AuthenticatorScreen> {
                                           );
                                         },
                                   icon: const Icon(Icons.copy),
+                                ),
+                                IconButton(
+                                  tooltip: t('Show setup QR', 'عرض رمز QR'),
+                                  onPressed: () => _showEntryQr(entry),
+                                  icon: const Icon(Icons.qr_code_2),
                                 ),
                                 IconButton(
                                   tooltip: t('Remove', 'حذف'),
