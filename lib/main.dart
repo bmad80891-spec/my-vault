@@ -91,6 +91,9 @@ class _VaultGateState extends State<VaultGate> {
           ? e.message.toString()
           : t('Could not open the vault. Please try again.', 'تعذر فتح الخزنة. حاول مرة أخرى.'));
     } finally {
+      // Do not keep the master password in UI controllers after an attempt.
+      password.clear();
+      confirm.clear();
       if (mounted) setState(() => busy = false);
     }
   }
