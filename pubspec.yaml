@@ -11,6 +11,7 @@ dependencies:
     sdk: flutter
   cryptography: ^2.7.0
   mobile_scanner: ^7.5.0
+  qr_flutter: ^4.1.0
   path: ^1.9.1
   sqflite: ^2.4.2
   sqflite_common_ffi: ^2.3.6
