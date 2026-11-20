@@ -213,9 +213,6 @@ class _AuthenticatorScreenState extends State<AuthenticatorScreen> {
     final issuer = TextEditingController(text: initialIssuer);
     final account = TextEditingController(text: initialAccount);
     final secret = TextEditingController(text: initialSecret);
-    final issuer = TextEditingController();
-    final account = TextEditingController();
-    final secret = TextEditingController();
     final formKey = GlobalKey<FormState>();
     final entry = await showDialog<TotpEntry>(
       context: context,
