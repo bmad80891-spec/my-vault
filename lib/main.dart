@@ -1,4 +1,4 @@
-
+import 'package:flutter/material.dart';
 import 'vault_store.dart';
 import 'authenticator_screen.dart';
 import 'supabase_bootstrap.dart';
