@@ -128,7 +128,7 @@ pub fn parse_otpauth_uri(raw: &str) -> Result<OtpAuth, TotpError> {
         .filter(|c| !c.is_whitespace() && *c != '=' && *c != '-')
         .collect::<String>()
         .to_uppercase();
-    if normalized.isEmpty() {
+    if normalized.is_empty() {
         return Err(TotpError::InvalidSecret);
     }
     // Validate Base32 (RFC4648, no padding after normalization)
