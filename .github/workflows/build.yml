@@ -111,6 +111,68 @@ jobs:
             dist_test/my_vault_rs-windows-x86_64.exe.sha256
           if-no-files-found: error
 
+  debian:
+    name: Build Debian (x86_64 .deb)
+    runs-on: ubuntu-latest
+    container:
+      image: debian:bookworm
+    steps:
+      - name: Install system dependencies
+        run: |
+          apt-get update
+          apt-get install -y curl ca-certificates build-essential pkg-config libssl-dev \
+            libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev \
+            libxkbcommon-x11-dev libwayland-dev libgtk-3-dev libasound2-dev git
+
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-gnu
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check (Debian)
+        run: cargo check --all-targets --target x86_64-unknown-linux-gnu
+
+      - name: Test (Debian)
+        run: cargo test --all-targets --target x86_64-unknown-linux-gnu
+
+      - name: Build release (Debian)
+        run: cargo build --release --target x86_64-unknown-linux-gnu
+
+      - name: Package Debian artifact
+        run: |
+          mkdir -p dist_test/deb/usr/local/bin
+          cp target/x86_64-unknown-linux-gnu/release/my_vault_rs dist_test/deb/usr/local/bin/my_vault_rs
+          chmod +x dist_test/deb/usr/local/bin/my_vault_rs
+          mkdir -p dist_test/deb/DEBIAN
+          cat > dist_test/deb/DEBIAN/control <<'CTRL'
+          Package: my-vault-rs
+          Version: 0.1.0
+          Section: utils
+          Priority: optional
+          Architecture: amd64
+          Maintainer: 5A1F Studio <official5a1fstudio@users.noreply.github.com>
+          Description: my_vault_rs - local password manager and TOTP authenticator
+          CTRL
+          dpkg-deb --build dist_test/deb dist_test/my-vault-rs_0.1.0_amd64.deb
+          cp target/x86_64-unknown-linux-gnu/release/my_vault_rs dist_test/my_vault_rs-debian-x86_64
+          (cd dist_test && sha256sum my-vault-rs_0.1.0_amd64.deb my_vault_rs-debian-x86_64 > my_vault_rs-debian.sha256)
+          ls -la dist_test
+
+      - name: Upload Debian artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: my_vault_rs-debian-x86_64
+          path: |
+            dist_test/my-vault-rs_0.1.0_amd64.deb
+            dist_test/my_vault_rs-debian-x86_64
+            dist_test/my_vault_rs-debian.sha256
+          if-no-files-found: error
+
   android:
     name: Build Android (aarch64)
     runs-on: ubuntu-latest
@@ -173,7 +235,7 @@ jobs:
 
   release:
     name: Publish Release
-    needs: [linux, windows, android]
+    needs: [linux, windows, android, debian]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
     steps:
