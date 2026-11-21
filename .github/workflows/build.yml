@@ -128,14 +128,17 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK/NDK
-        uses: android-actions/setup-android@v3
+      - name: Install Android NDK
+        uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r26d
+          add-to-path: false
 
-      - name: Install Android NDK and cargo-ndk
+      - name: Configure Android NDK and cargo-ndk
         run: |
-          sdkmanager --install "ndk;26.1.10909125" "platform-tools" "platforms;android-34" "build-tools;34.0.0"
-          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/26.1.10909125" >> $GITHUB_ENV
-          echo "NDK_HOME=$ANDROID_SDK_ROOT/ndk/26.1.10909125" >> $GITHUB_ENV
+          echo "ANDROID_NDK_HOME=${{ steps.setup-ndk.outputs.ndk-path }}" >> $GITHUB_ENV
+          echo "NDK_HOME=${{ steps.setup-ndk.outputs.ndk-path }}" >> $GITHUB_ENV
           cargo install cargo-ndk --locked
 
       - name: Rust cache

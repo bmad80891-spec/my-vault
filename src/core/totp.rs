@@ -278,26 +278,32 @@ pub mod desktop_capture {
 
     pub fn list_monitors() -> Result<Vec<CaptureTarget>, TotpError> {
         let monitors = xcap::Monitor::all().map_err(|e| TotpError::Capture(e.to_string()))?;
-        Ok(monitors
-            .into_iter()
-            .map(|m| CaptureTarget::Monitor {
-                id: m.id(),
-                name: m.name().to_string(),
-            })
-            .collect())
+        let mut out = Vec::new();
+        for m in monitors {
+            let id = m.id().map_err(|e| TotpError::Capture(e.to_string()))?;
+            let name = m.name().unwrap_or_else(|_| format!("Monitor {id}"));
+            out.push(CaptureTarget::Monitor { id, name });
+        }
+        Ok(out)
     }
 
     pub fn list_windows() -> Result<Vec<CaptureTarget>, TotpError> {
         let windows = xcap::Window::all().map_err(|e| TotpError::Capture(e.to_string()))?;
-        Ok(windows
-            .into_iter()
-            .filter(|w| !w.is_minimized())
-            .map(|w| CaptureTarget::Window {
-                id: w.id(),
-                title: w.title().to_string(),
-                app_name: w.app_name().to_string(),
-            })
-            .collect())
+        let mut out = Vec::new();
+        for w in windows {
+            let minimized = w.is_minimized().unwrap_or(false);
+            if minimized {
+                continue;
+            }
+            let id = match w.id() {
+                Ok(id) => id,
+                Err(_) => continue,
+            };
+            let title = w.title().unwrap_or_default();
+            let app_name = w.app_name().unwrap_or_default();
+            out.push(CaptureTarget::Window { id, title, app_name });
+        }
+        Ok(out)
     }
 
     /// Capture a selected desktop window/monitor (optionally cropped to a region) and scan it for an `otpauth://` QR code.
@@ -316,7 +322,7 @@ pub mod desktop_capture {
                 let monitor = xcap::Monitor::all()
                     .map_err(|e| TotpError::Capture(e.to_string()))?
                     .into_iter()
-                    .find(|m| &m.id() == id)
+                    .find(|m| m.id().ok().as_ref() == Some(id))
                     .ok_or_else(|| TotpError::Capture("monitor not found".into()))?;
                 let image = monitor
                     .capture_image()
@@ -327,7 +333,7 @@ pub mod desktop_capture {
                 let window = xcap::Window::all()
                     .map_err(|e| TotpError::Capture(e.to_string()))?
                     .into_iter()
-                    .find(|w| &w.id() == id)
+                    .find(|w| w.id().ok().as_ref() == Some(id))
                     .ok_or_else(|| TotpError::Capture("window not found".into()))?;
                 let image = window
                     .capture_image()
