@@ -45,7 +45,15 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Check (Linux)
-        run: cargo check --all-targets --target x86_64-unknown-linux-gnu
+        run: cargo check --all-targets --target x86_64-unknown-linux-gnu 2>&1 | tee check-linux.log; exit ${PIPESTATUS[0]}
+
+      - name: Upload Linux check log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: check-log-linux
+          path: check-linux.log
+          if-no-files-found: warn
 
       - name: Test (Linux)
         run: cargo test --all-targets --target x86_64-unknown-linux-gnu
@@ -85,7 +93,18 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Check (Windows)
-        run: cargo check --all-targets --target x86_64-pc-windows-msvc
+        shell: pwsh
+        run: |
+          cargo check --all-targets --target x86_64-pc-windows-msvc 2>&1 | Tee-Object -FilePath check-windows.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Upload Windows check log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: check-log-windows
+          path: check-windows.log
+          if-no-files-found: warn
 
       - name: Test (Windows)
         run: cargo test --all-targets --target x86_64-pc-windows-msvc
@@ -135,7 +154,15 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Check (Debian)
-        run: cargo check --all-targets --target x86_64-unknown-linux-gnu
+        run: cargo check --all-targets --target x86_64-unknown-linux-gnu 2>&1 | tee check-debian.log; exit ${PIPESTATUS[0]}
+
+      - name: Upload Debian check log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: check-log-debian
+          path: check-debian.log
+          if-no-files-found: warn
 
       - name: Test (Debian)
         run: cargo test --all-targets --target x86_64-unknown-linux-gnu
@@ -207,7 +234,15 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Check (Android)
-        run: cargo ndk -t arm64-v8a check --target aarch64-linux-android --lib
+        run: cargo ndk -t arm64-v8a check --target aarch64-linux-android --lib 2>&1 | tee check-android.log; exit ${PIPESTATUS[0]}
+
+      - name: Upload Android check log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: check-log-android
+          path: check-android.log
+          if-no-files-found: warn
 
       - name: Test (host unit tests)
         run: cargo test --lib

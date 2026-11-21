@@ -231,8 +231,8 @@ pub fn generate_totp(otp: &OtpAuth, unix_seconds: u64) -> Result<String, TotpErr
     Ok(format!("{:0width$}", code_int % modulus, width = otp.digits as usize))
 }
 
-fn hmac_bytes<M: Mac + hmac::digest::KeyInit>(key: &[u8], msg: &[u8]) -> Vec<u8> {
-    let mut mac = <M as hmac::digest::KeyInit>::new_from_slice(key).expect("HMAC accepts any key length");
+fn hmac_bytes<M: Mac>(key: &[u8], msg: &[u8]) -> Vec<u8> {
+    let mut mac = <M as Mac>::new_from_slice(key).expect("HMAC accepts any key length");
     mac.update(msg);
     mac.finalize().into_bytes().to_vec()
 }
